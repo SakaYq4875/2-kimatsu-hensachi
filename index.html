@@ -1,41 +1,254 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>偏差値計算ツール</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <title>教科別 偏差値計算ツール</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f7fb;
+      padding: 20px;
+    }
+    .card {
+      max-width: 980px;
+      margin: auto;
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+    }
+    h1 {
+      font-size: 1.4rem;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background: #eef2ff;
+    }
+    input[type="number"] {
+      width: 70px;
+      padding: 6px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+    .note {
+      margin-top: 12px;
+      font-size: 0.8rem;
+      color: #555;
+      text-align: center;
+    }
+    /* 色分け */
+    .pink { background:#ffd6e7; }
+    .yellow { background:#fff3bf; }
+    .blue { background:#B1F5F9; }
+    .green { background:#e6f4ea; }
+    .orange { background:#ffe0b2; }
+    .purple { background:#eadcff; }
+
+    /* 差の文字色 */
+    .diff-plus { color: #d32f2f; font-weight: 600; }
+    .diff-minus { color: #1976d2; font-weight: 600; }
+    .diff-zero { color: #555; }
+  </style>
 </head>
 <body>
-<h1>偏差値計算ツール</h1>
+  <div class="card">
+    <h1>教科別 偏差値計算ツール</h1>
+    <div style="text-align:center;margin-bottom:8px;">
+      <label><input type="checkbox" id="toggleSD"> 標準偏差を表示</label>
+    </div>
 
+    
 
-<div class="container">
-<label>
-自分の点数
-<input type="number" id="score">
-</label>
+    <table id="scoreTable">
+      <thead>
+        <tr>
+          <th>教科</th>
+          <th>平均点</th>
+          <th class="sd-col">標準偏差</th>
+          <th>自分の点数</th>
+          <th>平均との差</th>
+          <th>偏差値</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
 
+    <table style="margin-top:20px;">
+      <thead>
+        <tr>
+          <th>平均点合計</th>
+          <th>合計得点</th>
+          <th>平均偏差値</th>
+          <th>全体平均との差</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td id="sumMean">—</td>
+          <td id="sumScore">0.00</td>
+          <td id="avgHensachi">—</td>
+          <td id="totalDiff">0.00</td>
+        </tr>
+      </tbody>
+    </table>
 
-<label>
-平均点
-<input type="number" id="average">
-</label>
+    <div class="note">※ 偏差値 = 50 + 10 × (得点 − 平均) ÷ 標準偏差 ／ 点数は0未満不可</div>
+  </div>
 
+  <script>
+    // ★ デフォルトCSV（列形式）
+    // 1列目: 教科, 2列目: 平均点, 3列目: 標準偏差
+    const defaultCSV = `教科,平均点,標準偏差
+国語A,31.5,8.021
+国語B,29.4,7.679
+地理,80.3,16.580
+歴史,70.9,17.997
+代数,78.5,16.105
+幾何,81.7,14.792
+物理,79.0,13.671
+化学,70.8,15.600
+生物,64.8,11.621
+地学,84.4,12.267
+音楽,71.9,14.936
+保体,80.5,10.387
+技術,34.3,10.689
+家庭,42.7,6.018
+英語,74.9,13.156`;
 
-<label>
-標準偏差
-<input type="number" id="sd">
-</label>
+    buildTable(defaultCSV);
 
+    // 初期状態：標準偏差は非表示
+    toggleSD(false);
 
-<button id="calcBtn">計算</button>
+    document.getElementById('toggleSD').addEventListener('change', e => {
+      toggleSD(e.target.checked);
+    });
 
+    function toggleSD(show) {
+      document.querySelectorAll('.sd-col, #scoreTable td:nth-child(3)').forEach(el => {
+        el.style.display = show ? '' : 'none';
+      });
+    }
 
-<p id="error" class="error"></p>
-<h2 id="result"></h2>
-</div>
+    function buildTable(csvText) {
+      const lines = csvText.trim().split(/\r?\n/);
+      const rows = lines.map(l => l.split(','));
+      const data = rows.slice(1);
 
+      const tbody = document.querySelector('#scoreTable tbody');
+      const sumMeanCell = document.getElementById('sumMean');
+      const totalDiffCell = document.getElementById('totalDiff');
+      const sumScoreCell = document.getElementById('sumScore');
+      const avgHensachiCell = document.getElementById('avgHensachi');
 
-<script src="script.js"></script>
+      let totalMean = 0;
+      tbody.innerHTML = '';
+
+      data.forEach(row => {
+        const [subject, meanStr, sdStr] = row;
+        const mean = Number(meanStr);
+        const sd = Number(sdStr);
+        totalMean += mean;
+
+        const tr = document.createElement('tr');
+        const colorClass = getColorClass(subject);
+
+        tr.innerHTML = `
+          <td>${subject}</td>
+          <td>${mean}</td>
+          <td class="sd-col">${sd}</td>
+          <td style="display:flex;gap:4px;align-items:center;">
+            <input type="number" min="0" max="${getMaxScore(subject)}" step="any" class="${colorClass}">
+            <span>/${getMaxScore(subject)}</span>
+          </td>
+          <td class="diff">—</td>
+          <td class="result">—</td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+
+      sumMeanCell.textContent = totalMean.toFixed(2);
+
+      // 入力イベント（再計算）
+      tbody.querySelectorAll('input').forEach(input => {
+        input.addEventListener('input', () => {
+          let totalScore = 0;
+          let hensachiList = [];
+
+          tbody.querySelectorAll('tr').forEach(r => {
+            const meanVal = Number(r.children[1].textContent);
+            const sdVal = Number(r.children[2].textContent);
+            const inp = r.querySelector('input');
+            const diffCell = r.querySelector('.diff');
+            const resCell = r.querySelector('.result');
+            const score = parseFloat(inp.value);
+
+            if (!isNaN(score)) {
+              totalScore += score;
+              const diff = score - meanVal;
+              diffCell.textContent = diff.toFixed(2);
+              diffCell.classList.remove('diff-plus','diff-minus','diff-zero');
+              if (diff > 0) diffCell.classList.add('diff-plus');
+              else if (diff < 0) diffCell.classList.add('diff-minus');
+              else diffCell.classList.add('diff-zero');
+              if (sdVal !== 0) {
+                const h = 50 + 10 * diff / sdVal;
+                resCell.textContent = h.toFixed(2);
+                hensachiList.push(h);
+              } else {
+                resCell.textContent = '—';
+              }
+            } else {
+              diffCell.textContent = '—';
+              diffCell.classList.remove('diff-plus','diff-minus','diff-zero');
+              resCell.textContent = '—';
+            }
+          });
+
+          sumScoreCell.textContent = totalScore.toFixed(2);
+          const totalDiff = totalScore - totalMean;
+          totalDiffCell.textContent = totalDiff.toFixed(2);
+          totalDiffCell.classList.remove('diff-plus','diff-minus','diff-zero');
+          if (totalDiff > 0) totalDiffCell.classList.add('diff-plus');
+          else if (totalDiff < 0) totalDiffCell.classList.add('diff-minus');
+          else totalDiffCell.classList.add('diff-zero');
+          if (hensachiList.length > 0) {
+            const avg = hensachiList.reduce((a, b) => a + b, 0) / hensachiList.length;
+            avgHensachiCell.textContent = avg.toFixed(2);
+          } else {
+            avgHensachiCell.textContent = '—';
+          }
+        });
+      });
+    }
+
+    function getMaxScore(subject) {
+      if (subject === '国語A' || subject === '国語B' || subject === '技術' || subject === '家庭') return 50;
+      return 100;
+    }
+
+    function getColorClass(subject) {
+      if (subject === '国語A' || subject === '国語B') return 'pink';
+      if (subject === '地理' || subject === '歴史') return 'yellow';
+      if (subject === '代数' || subject === '幾何') return 'blue';
+      if (['物理','化学','生物','地学'].includes(subject)) return 'green';
+      if (['音楽','保体','技術','家庭'].includes(subject)) return 'orange';
+      if (subject === '英語') return 'purple';
+      return '';
+    }
+  </script>
 </body>
 </html>
