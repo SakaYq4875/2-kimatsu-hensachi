@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>偏差値計算ツール</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<h1>偏差値計算ツール</h1>
+
+
+<div class="container">
+<label>
+自分の点数
+<input type="number" id="score">
+</label>
+
+
+<label>
+平均点
+<input type="number" id="average">
+</label>
+
+
+<label>
+標準偏差
+<input type="number" id="sd">
+</label>
+
+
+<button id="calcBtn">計算</button>
+
+
+<p id="error" class="error"></p>
+<h2 id="result"></h2>
+</div>
+
+
+<script src="script.js"></script>
+</body>
+</html>
